@@ -1,0 +1,57 @@
+{
+  "models": {
+    "LogisticRegression": {
+      "accuracy": 0.809,
+      "roc_auc": 0.8398
+    },
+    "RandomForestClassifier": {
+      "accuracy": 0.803,
+      "roc_auc": 0.7953
+    },
+    "GradientBoostingClassifier": {
+      "accuracy": 0.81,
+      "roc_auc": 0.8247
+    }
+  },
+  "winning_model": "LogisticRegression",
+  "winning_model_metrics": {
+    "accuracy": 0.809,
+    "roc_auc": 0.8398
+  },
+  "feature_names": [
+    "amount_due",
+    "days_overdue",
+    "payment_history_score",
+    "total_past_defaults",
+    "case_type_loan",
+    "case_type_transaction",
+    "npa_status_NPA",
+    "npa_status_SMA-0",
+    "npa_status_SMA-1",
+    "npa_status_SMA-2",
+    "npa_status_Standard",
+    "failure_reason_bank_downtime",
+    "failure_reason_card_declined",
+    "failure_reason_insufficient_funds",
+    "failure_reason_missed_emi",
+    "failure_reason_otp_failure"
+  ],
+  "feature_importances": {
+    "failure_reason_bank_downtime": 0.1381,
+    "days_overdue": 0.1181,
+    "npa_status_Standard": 0.1102,
+    "failure_reason_missed_emi": 0.1048,
+    "npa_status_NPA": 0.098,
+    "failure_reason_insufficient_funds": 0.0729,
+    "failure_reason_otp_failure": 0.0697,
+    "payment_history_score": 0.0653,
+    "npa_status_SMA-2": 0.0571,
+    "total_past_defaults": 0.0513,
+    "amount_due": 0.0383,
+    "npa_status_SMA-0": 0.0358,
+    "failure_reason_card_declined": 0.0303,
+    "npa_status_SMA-1": 0.009,
+    "case_type_loan": 0.0008,
+    "case_type_transaction": 0.0005
+  }
+}
