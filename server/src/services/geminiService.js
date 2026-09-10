@@ -6,7 +6,7 @@ function getGenerativeModel() {
     return null;
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  return genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
 }
 
 /**
@@ -60,7 +60,7 @@ async function explainDecision(caseData, prediction, decision) {
   }
 
   const prompt = `
-You are an expert credit recovery AI analyst for RazorPay RecoveryIQ.
+You are an expert credit recovery AI analyst for RecoveryIQ.
 Explain in 2-3 concise, professional sentences why the following recovery action was recommended:
 
 Case Details:
