@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import {
   Search,
   Filter,
@@ -35,6 +36,8 @@ const STATUS_BADGES = {
 };
 
 const Cases = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -175,46 +178,48 @@ const Cases = () => {
           </p>
         </div>
 
-        {/* Secondary Import & Export Buttons */}
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={handleUploadClick}
-            disabled={isUploading}
-            className="flex items-center space-x-2 bg-white hover:bg-slate-50 text-slate-700 font-medium px-3.5 py-2 rounded-xl border border-slate-200 text-sm shadow-sm transition disabled:opacity-60"
-            title="Import cases from Excel/CSV"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
-                <span>Importing...</span>
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 text-slate-500" />
-                <span>Upload Excel</span>
-              </>
-            )}
-          </button>
+        {/* Secondary Import & Export Buttons (Admin only) */}
+        {isAdmin && (
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleUploadClick}
+              disabled={isUploading}
+              className="flex items-center space-x-2 bg-white hover:bg-slate-50 text-slate-700 font-medium px-3.5 py-2 rounded-xl border border-slate-200 text-sm shadow-sm transition disabled:opacity-60"
+              title="Import cases from Excel/CSV"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+                  <span>Importing...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 text-slate-500" />
+                  <span>Upload Excel</span>
+                </>
+              )}
+            </button>
 
-          <button
-            onClick={handleExportExcel}
-            disabled={isExporting}
-            className="flex items-center space-x-2 bg-white hover:bg-slate-50 text-slate-700 font-medium px-3.5 py-2 rounded-xl border border-slate-200 text-sm shadow-sm transition disabled:opacity-60"
-            title="Export all cases to Excel"
-          >
-            {isExporting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
-                <span>Exporting...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 text-slate-500" />
-                <span>Export to Excel</span>
-              </>
-            )}
-          </button>
-        </div>
+            <button
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              className="flex items-center space-x-2 bg-white hover:bg-slate-50 text-slate-700 font-medium px-3.5 py-2 rounded-xl border border-slate-200 text-sm shadow-sm transition disabled:opacity-60"
+              title="Export all cases to Excel"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+                  <span>Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-slate-500" />
+                  <span>Export to Excel</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Upload Summary Toast / Banner */}

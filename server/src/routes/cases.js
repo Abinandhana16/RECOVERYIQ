@@ -12,6 +12,7 @@ const mlClient = require('../services/mlClient');
 const decisionEngine = require('../services/decisionEngine');
 const geminiService = require('../services/geminiService');
 const authMiddleware = require('../middleware/authMiddleware');
+const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -81,9 +82,9 @@ function normalizeNpaStatus(val, daysOverdue) {
 
 /**
  * POST /api/cases/bulk-upload
- * Bulk import cases from uploaded Excel or CSV spreadsheet
+ * Bulk import cases from uploaded Excel or CSV spreadsheet (Admin only)
  */
-router.post('/bulk-upload', upload.single('file'), async (req, res) => {
+router.post('/bulk-upload', requireAdmin, upload.single('file'), async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ error: 'Please provide an Excel or CSV file in the "file" field.' });
@@ -220,9 +221,9 @@ router.post('/bulk-upload', upload.single('file'), async (req, res) => {
 
 /**
  * GET /api/cases/export
- * Download current cases as an Excel (.xlsx) file
+ * Download current cases as an Excel (.xlsx) file (Admin only)
  */
-router.get('/export', async (req, res) => {
+router.get('/export', requireAdmin, async (req, res) => {
   try {
     const filter = {};
     if (req.query.case_status) filter.case_status = req.query.case_status;
@@ -292,6 +293,53 @@ router.get('/export', async (req, res) => {
   } catch (error) {
     console.error('Error exporting cases to Excel:', error);
     return res.status(500).json({ error: error.message || 'Error generating Excel export' });
+  }
+});
+
+/**
+ * GET /api/cases/upload-template
+ * Download a sample Excel template for bulk case uploads (Admin only)
+ */
+router.get('/upload-template', requireAdmin, (req, res) => {
+  try {
+    const sampleHeaders = [
+      {
+        'Customer Name': 'Sample Customer',
+        'Phone': '+91 98000 00000',
+        'Email': 'customer@example.com',
+        'Payment History Score': 0.85,
+        'Total Past Defaults': 0,
+        'Relationship Length': 24,
+        'Case Type': 'transaction',
+        'Amount Due': 5000,
+        'Days Overdue': 15,
+        'Failure Reason': 'insufficient_funds',
+        'NPA Status': 'SMA-0',
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleHeaders);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
+
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
+      bookType: 'xlsx',
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=recoveryiq-upload-template.xlsx'
+    );
+
+    return res.status(200).send(excelBuffer);
+  } catch (error) {
+    console.error('Error generating template:', error);
+    return res.status(500).json({ error: error.message || 'Failed to generate template' });
   }
 });
 

@@ -37,12 +37,12 @@ router.post('/register', async (req, res) => {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create user
+    // Create user - always force role to 'agent' for public registration
     const user = new User({
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
-      role: role && ['admin', 'agent'].includes(role) ? role : 'agent',
+      role: 'agent',
     });
 
     await user.save();

@@ -97,6 +97,7 @@ Provide only the 2-3 sentence explanation with no greetings or markdown headers.
  */
 async function draftMessage(caseData, decision) {
   const model = getGenerativeModel();
+  
   if (!model) {
     return getFallbackDraftMessage(caseData, decision);
   }
