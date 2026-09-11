@@ -3,7 +3,7 @@
 > An AI system that answers three questions for every overdue payment or loan:
 > **who to approach, what action to take, and why.**
 
-**Live Demo:** _[recoveryiqengine.vercel.app]_
+**Live Demo:** _ [recoveryiqengine.vercel.app](https://recoveryiqengine.vercel.app)
 **Demo Login:** `agent@recoveryiq.com` / `password123`
 
 ---
