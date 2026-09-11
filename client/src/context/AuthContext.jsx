@@ -3,13 +3,31 @@ import api, { setAuthToken } from '../api/axios';
 
 const AuthContext = createContext(null);
 
+const TOKEN_KEY = 'recoveryiq_token';
+const USER_KEY = 'recoveryiq_user';
+
 export const AuthProvider = ({ children }) => {
-  // Store token in React state only (not localStorage) per requirements
-  const [token, setToken] = useState(null);
-  const [user, setUser] = useState(null);
+  // Restore authentication from localStorage on initial load
+  const [token, setToken] = useState(() => {
+    try {
+      return localStorage.getItem(TOKEN_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem(USER_KEY);
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [loading, setLoading] = useState(false);
 
-  // Sync token to axios interceptor
+  // Sync token with axios interceptor whenever token state changes
   useEffect(() => {
     setAuthToken(token);
   }, [token]);
@@ -19,6 +37,11 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/auth/login', { email, password });
       const { user: userData, token: jwtToken } = response.data;
+
+      // Persist to localStorage
+      localStorage.setItem(TOKEN_KEY, jwtToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
+
       setToken(jwtToken);
       setUser(userData);
       return { success: true, user: userData };
@@ -34,6 +57,11 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/auth/register', { name, email, password });
       const { user: userData, token: jwtToken } = response.data;
+
+      // Persist to localStorage
+      localStorage.setItem(TOKEN_KEY, jwtToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
+
       setToken(jwtToken);
       setUser(userData);
       return { success: true, user: userData };
@@ -45,6 +73,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Clear persisted credentials
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+
     setToken(null);
     setUser(null);
   };

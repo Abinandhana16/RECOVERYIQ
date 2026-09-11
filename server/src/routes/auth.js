@@ -23,7 +23,26 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2) {
+      return res.status(400).json({
+        error: 'Name must be at least 2 characters long.',
+      });
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        error: 'Please provide a valid email address.',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        error: 'Password must be at least 6 characters long.',
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email: normalizedEmail });

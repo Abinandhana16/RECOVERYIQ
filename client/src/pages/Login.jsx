@@ -3,20 +3,67 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+
+  // Field-specific validation errors & touched states
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [serverError, setServerError] = useState('');
+
   const { login, loading } = useAuth();
   const navigate = useNavigate();
 
+  const validateField = (field, value) => {
+    let errorMsg = '';
+    if (field === 'email') {
+      if (!value.trim()) {
+        errorMsg = 'Email address is required.';
+      } else if (!EMAIL_REGEX.test(value.trim())) {
+        errorMsg = 'Please enter a valid email address.';
+      }
+    } else if (field === 'password') {
+      if (!value) {
+        errorMsg = 'Password is required.';
+      }
+    }
+    return errorMsg;
+  };
+
+  const handleBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const val = field === 'email' ? email : password;
+    const err = validateField(field, val);
+    setErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
+  const handleChange = (field, value) => {
+    if (field === 'email') setEmail(value);
+    if (field === 'password') setPassword(value);
+
+    // If already touched, validate live
+    if (touched[field]) {
+      const err = validateField(field, value);
+      setErrors((prev) => ({ ...prev, [field]: err }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setServerError('');
 
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    // Mark all touched and validate
+    const emailErr = validateField('email', email);
+    const passErr = validateField('password', password);
+
+    setTouched({ email: true, password: true });
+    setErrors({ email: emailErr, password: passErr });
+
+    if (emailErr || passErr) {
       return;
     }
 
@@ -24,9 +71,11 @@ const Login = () => {
     if (res.success) {
       navigate('/dashboard');
     } else {
-      setError(res.error || 'Failed to login. Please check your credentials.');
+      setServerError(res.error || 'Failed to login. Please check your credentials.');
     }
   };
+
+  const hasErrors = Object.values(errors).some((err) => Boolean(err));
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -41,14 +90,14 @@ const Login = () => {
           </p>
         </div>
 
-        {error && (
+        {serverError && (
           <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start space-x-3 text-red-700 text-sm">
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-500" />
-            <span>{error}</span>
+            <span>{serverError}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
               Email Address
@@ -57,10 +106,21 @@ const Login = () => {
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => handleChange('email', e.target.value)}
+              onBlur={() => handleBlur('email')}
               placeholder="agent@recoveryiq.com"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
+              className={`w-full px-4 py-2.5 rounded-xl border text-sm transition focus:outline-none focus:ring-2 ${
+                touched.email && errors.email
+                  ? 'border-red-300 bg-red-50/20 focus:ring-red-500 focus:border-transparent'
+                  : 'border-slate-300 focus:ring-sky-500 focus:border-transparent'
+              }`}
             />
+            {touched.email && errors.email && (
+              <p className="mt-1.5 text-xs text-red-600 font-medium flex items-center">
+                <AlertCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
+                {errors.email}
+              </p>
+            )}
           </div>
 
           <div>
@@ -72,9 +132,14 @@ const Login = () => {
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => handleChange('password', e.target.value)}
+                onBlur={() => handleBlur('password')}
                 placeholder="••••••••"
-                className="w-full pl-4 pr-11 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
+                className={`w-full pl-4 pr-11 py-2.5 rounded-xl border text-sm transition focus:outline-none focus:ring-2 ${
+                  touched.password && errors.password
+                    ? 'border-red-300 bg-red-50/20 focus:ring-red-500 focus:border-transparent'
+                    : 'border-slate-300 focus:ring-sky-500 focus:border-transparent'
+                }`}
               />
               <button
                 type="button"
@@ -89,12 +154,18 @@ const Login = () => {
                 )}
               </button>
             </div>
+            {touched.password && errors.password && (
+              <p className="mt-1.5 text-xs text-red-600 font-medium flex items-center">
+                <AlertCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
+                {errors.password}
+              </p>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl shadow-md shadow-sky-200 transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
+            disabled={loading || hasErrors}
+            className="w-full py-3 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl shadow-md shadow-sky-200 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
             <ArrowRight className="w-4 h-4" />

@@ -9,6 +9,7 @@ import Cases from './pages/Cases';
 import CaseDetails from './pages/CaseDetails';
 import RecoveryActions from './pages/RecoveryActions';
 import ModelPerformance from './pages/ModelPerformance';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -34,8 +35,8 @@ function App() {
         <Route path="model-performance" element={<ModelPerformance />} />
       </Route>
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* 404 Catch-All Route */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
