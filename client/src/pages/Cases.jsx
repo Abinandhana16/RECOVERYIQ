@@ -66,7 +66,7 @@ const Cases = () => {
       if (npaFilter) params.npa_status = npaFilter;
       if (statusFilter) params.case_status = statusFilter;
 
-      const res = await api.get('/cases', { params });
+      const res = await api.get('/api/cases', { params });
       setCases(res.data.cases || []);
     } catch (err) {
       setError(err.message || 'Failed to fetch cases');
@@ -91,7 +91,7 @@ const Cases = () => {
     formData.append('file', file);
 
     try {
-      const res = await api.post('/cases/bulk-upload', formData, {
+      const res = await api.post('/api/cases/bulk-upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -125,7 +125,7 @@ const Cases = () => {
       if (npaFilter) params.npa_status = npaFilter;
       if (statusFilter) params.case_status = statusFilter;
 
-      const response = await api.get('/cases/export', {
+      const response = await api.get('/api/cases/export', {
         params,
         responseType: 'blob',
       });
