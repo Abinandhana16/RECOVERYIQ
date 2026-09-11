@@ -56,7 +56,7 @@ const RecoveryActions = () => {
       if (actionTypeFilter) params.action_type = actionTypeFilter;
       if (outcomeFilter) params.outcome = outcomeFilter;
 
-      const res = await api.get('/actions', { params });
+      const res = await api.get('/api/actions', { params });
       setActions(res.data.actions || []);
     } catch (err) {
       setError(err.message || 'Failed to load recovery actions');

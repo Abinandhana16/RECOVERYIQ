@@ -51,7 +51,7 @@ const CaseDetails = () => {
   const fetchCaseDetails = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/cases/${id}`);
+      const res = await api.get(`/api/cases/${id}`);
       setCaseData(res.data.case);
       setActions(res.data.actions || []);
 
@@ -85,7 +85,7 @@ const CaseDetails = () => {
     setAnalyzing(true);
     setError('');
     try {
-      const res = await api.post(`/cases/${id}/analyze`);
+      const res = await api.post(`/api/cases/${id}/analyze`);
       setCaseData(res.data.case);
       setAnalysisResult({
         recovery_probability: res.data.prediction.recovery_probability,

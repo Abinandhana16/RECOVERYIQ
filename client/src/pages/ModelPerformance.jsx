@@ -33,7 +33,7 @@ const ModelPerformance = () => {
   const fetchMetrics = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/ml/model-metrics');
+      const res = await api.get('/api/ml/model-metrics');
       setMetrics(res.data);
     } catch (err) {
       setError(err.message || 'Failed to load model performance metrics');
