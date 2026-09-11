@@ -37,7 +37,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        const res = await api.get('/cases');
+        const res = await api.get('/api/cases');
         setCases(res.data.cases || []);
       } catch (err) {
         setError(err.message || 'Failed to fetch recovery cases');
