@@ -1,206 +1,146 @@
-const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const ML_SERVICE_URL =
-  process.env.ML_SERVICE_URL || 'http://localhost:8000';
-
-const MAX_RETRIES = 2;
-const RETRY_DELAY = 1500;
-
-/**
- * Wait before retrying a failed ML request.
- */
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Check whether an error is temporary and worth retrying.
- */
-function isRetryableError(error) {
-  if (
-    error.code === 'ECONNREFUSED' ||
-    error.code === 'ENOTFOUND' ||
-    error.code === 'ECONNABORTED' ||
-    error.code === 'ETIMEDOUT'
-  ) {
-    return true;
+function getGenerativeModel() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return null;
   }
-
-  const status = error.response?.status;
-
-  return status === 502 || status === 503 || status === 504;
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
 }
 
 /**
- * Request recovery probability prediction from the Python ML service.
- *
- * Automatically retries temporary ML service failures.
- *
+ * Fallback generator for decision explanation if AI service is offline or key is missing.
+ */
+function getFallbackExplanation(caseData, prediction, decision) {
+  const probPercent = ((prediction?.recovery_probability || 0) * 100).toFixed(1);
+  const actionType = decision?.action_type || 'payment_link';
+  const customerName = caseData?.name || caseData?.customer_id?.name || 'Customer';
+  const daysOverdue = caseData?.days_overdue || 0;
+  const npaStatus = caseData?.npa_status || 'Standard';
+
+  if (actionType === 'human_followup') {
+    return `Given the high-risk classification (${npaStatus} with ${daysOverdue} days overdue and ${probPercent}% estimated recovery probability), manual intervention by a senior recovery specialist is required to negotiate an amicable settlement.`;
+  } else if (actionType === 'reminder') {
+    return `With a strong credit profile and high estimated recovery probability of ${probPercent}%, an automated soft reminder is the most cost-effective and non-intrusive recovery strategy for ${customerName}.`;
+  } else {
+    return `With a moderate recovery probability of ${probPercent}% and overdue amount of ₹${caseData?.amount_due}, sending an instant frictionless payment link maximizes conversion without incurring high agent intervention costs.`;
+  }
+}
+
+/**
+ * Fallback generator for customer message / agent note if AI service is offline or key is missing.
+ */
+function getFallbackDraftMessage(caseData, decision) {
+  const customerName = caseData?.name || caseData?.customer_id?.name || 'Customer';
+  const amount = caseData?.amount_due ? `₹${Number(caseData.amount_due).toLocaleString('en-IN')}` : 'your pending amount';
+  const caseId = caseData?.case_id || 'your account';
+  const actionType = decision?.action_type || 'payment_link';
+
+  if (actionType === 'reminder') {
+    return `Hi ${customerName}, this is a gentle reminder that your pending payment of ${amount} for Ref #${caseId} is due. Please clear it today to maintain an excellent credit standing.`;
+  } else if (actionType === 'payment_link') {
+    return `Hi ${customerName}, your payment of ${amount} is currently overdue. Click here to instantly clear your balance via RazorPay secure checkout: https://rzp.io/l/recovery-${caseId}`;
+  } else {
+    return `[Agent Briefing Note] Customer: ${customerName} | Balance: ${amount} | Overdue: ${caseData?.days_overdue} days (${caseData?.npa_status}). Objective: Contact customer empathetically, understand root cause of failure (${caseData?.failure_reason || 'unspecified'}), and offer structured settlement or restructured EMI options.`;
+  }
+}
+
+/**
+ * Generate a 2-3 sentence plain-English explanation of why this action was recommended.
  * @param {Object} caseData
- * @returns {Promise<{ recovery_probability: number, risk_tier: string }>}
+ * @param {Object} prediction
+ * @param {Object} decision
+ * @returns {Promise<string>}
  */
-async function getPrediction(caseData) {
-  const payload = {
-    case_type: caseData.case_type,
-    amount_due: Number(caseData.amount_due),
-    days_overdue: Number(caseData.days_overdue),
-    npa_status: caseData.npa_status || 'Standard',
-    payment_history_score: Number(caseData.payment_history_score),
-    total_past_defaults: Number(caseData.total_past_defaults || 0),
-    failure_reason: caseData.failure_reason || 'insufficient_funds',
-  };
-
-  let lastError = null;
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await axios.post(
-        `${ML_SERVICE_URL}/predict`,
-        payload,
-        {
-          timeout: 10000,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (
-        response.data &&
-        typeof response.data.recovery_probability === 'number'
-      ) {
-        return {
-          recovery_probability: response.data.recovery_probability,
-          risk_tier: response.data.risk_tier,
-        };
-      }
-
-      throw new Error(
-        'Invalid response format received from ML service'
-      );
-    } catch (error) {
-      lastError = error;
-
-      const shouldRetry =
-        isRetryableError(error) && attempt < MAX_RETRIES;
-
-      if (shouldRetry) {
-        console.warn(
-          `ML prediction request failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}). ` +
-          `Retrying in ${RETRY_DELAY}ms...`
-        );
-
-        await sleep(RETRY_DELAY);
-        continue;
-      }
-
-      break;
-    }
+async function explainDecision(caseData, prediction, decision) {
+  const model = getGenerativeModel();
+  if (!model) {
+    return getFallbackExplanation(caseData, prediction, decision);
   }
 
-  // Final user-friendly error
-  if (
-    lastError?.code === 'ECONNREFUSED' ||
-    lastError?.code === 'ENOTFOUND' ||
-    lastError?.code === 'ECONNABORTED' ||
-    lastError?.code === 'ETIMEDOUT'
-  ) {
-    throw new Error(
-      'AI prediction service is temporarily unavailable. Please try again in a few moments.'
-    );
+  const prompt = `
+You are an expert credit recovery AI analyst for RecoveryIQ.
+Explain in 2-3 concise, professional sentences why the following recovery action was recommended:
+
+Case Details:
+- Customer Name: ${caseData.name || caseData.customer_id?.name || 'Customer'}
+- Case Type: ${caseData.case_type}
+- Amount Due: ₹${caseData.amount_due}
+- Days Overdue: ${caseData.days_overdue}
+- NPA Status: ${caseData.npa_status}
+- Failure Reason: ${caseData.failure_reason}
+- Credit History Score: ${caseData.payment_history_score || caseData.customer_id?.payment_history_score}
+- Past Defaults: ${caseData.total_past_defaults || caseData.customer_id?.total_past_defaults}
+- Predicted Recovery Probability: ${(prediction.recovery_probability * 100).toFixed(1)}% (${prediction.risk_tier} tier)
+- Recommended Action: ${decision.action_type}
+- Expected Recovery Value: ₹${decision.expected_recovery_value}
+
+Provide only the 2-3 sentence explanation with no greetings or markdown headers.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+    return text || getFallbackExplanation(caseData, prediction, decision);
+  } catch (error) {
+    console.warn('Gemini explanation error, using fallback:', error.message);
+    return getFallbackExplanation(caseData, prediction, decision);
   }
-
-  if (lastError?.response) {
-    const status = lastError.response.status;
-
-    if (status === 502 || status === 503 || status === 504) {
-      throw new Error(
-        'AI prediction service is temporarily unavailable. Please try again in a few moments.'
-      );
-    }
-
-    throw new Error(
-      `ML Service error (${status}). Please try again later.`
-    );
-  }
-
-  throw new Error(
-    `Unable to get AI prediction: ${lastError?.message || 'Unknown error'}`
-  );
 }
 
 /**
- * Retrieve trained model metrics and feature importances
- * from the Python ML service.
- *
- * @returns {Promise<Object>}
+ * Draft a short, personalized customer-facing message or human agent brief.
+ * @param {Object} caseData
+ * @param {Object} decision
+ * @returns {Promise<string>}
  */
-async function getModelMetrics() {
-  let lastError = null;
+async function draftMessage(caseData, decision) {
+  const model = getGenerativeModel();
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await axios.get(
-        `${ML_SERVICE_URL}/model-metrics`,
-        {
-          timeout: 10000,
-        }
-      );
-
-      return response.data;
-    } catch (error) {
-      lastError = error;
-
-      const shouldRetry =
-        isRetryableError(error) && attempt < MAX_RETRIES;
-
-      if (shouldRetry) {
-        console.warn(
-          `ML metrics request failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}). ` +
-          `Retrying in ${RETRY_DELAY}ms...`
-        );
-
-        await sleep(RETRY_DELAY);
-        continue;
-      }
-
-      break;
-    }
+  if (!model) {
+    return getFallbackDraftMessage(caseData, decision);
   }
 
-  if (
-    lastError?.code === 'ECONNREFUSED' ||
-    lastError?.code === 'ENOTFOUND' ||
-    lastError?.code === 'ECONNABORTED' ||
-    lastError?.code === 'ETIMEDOUT'
-  ) {
-    throw new Error(
-      'AI model service is temporarily unavailable. Please try again in a few moments.'
-    );
+  const actionType = decision.action_type;
+  const customerName = caseData.name || caseData.customer_id?.name || 'Customer';
+  const amount = caseData.amount_due;
+  const caseId = caseData.case_id;
+
+  let messageObjective = '';
+  if (actionType === 'reminder') {
+    messageObjective = 'Draft a polite, respectful SMS/WhatsApp reminder to the customer asking them to settle their pending balance.';
+  } else if (actionType === 'payment_link') {
+    messageObjective = `Draft a direct, helpful payment link message with link placeholder https://rzp.io/l/recovery-${caseId} enabling the customer to pay immediately.`;
+  } else {
+    messageObjective = 'Draft an internal briefing note for a human recovery collection officer detailing talking points, customer empathy, and restructuring suggestions.';
   }
 
-  if (lastError?.response) {
-    const status = lastError.response.status;
+  const prompt = `
+You are RecoveryIQ's automated communication engine.
+${messageObjective}
 
-    if (status === 502 || status === 503 || status === 504) {
-      throw new Error(
-        'AI model service is temporarily unavailable. Please try again in a few moments.'
-      );
-    }
+Context:
+- Customer Name: ${customerName}
+- Overdue Amount: ₹${amount}
+- Case Ref: ${caseId}
+- Days Overdue: ${caseData.days_overdue}
+- Recommended Action: ${actionType}
 
-    throw new Error(
-      `ML Service error (${status}). Please try again later.`
-    );
+Format: Return only the message text itself. Keep it concise, professional, and compliant with financial communications.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+    return text || getFallbackDraftMessage(caseData, decision);
+  } catch (error) {
+    console.warn('Gemini draft message error, using fallback:', error.message);
+    return getFallbackDraftMessage(caseData, decision);
   }
-
-  throw new Error(
-    `Unable to fetch ML model metrics: ${
-      lastError?.message || 'Unknown error'
-    }`
-  );
 }
 
 module.exports = {
-  getPrediction,
-  getModelMetrics,
+  explainDecision,
+  draftMessage,
 };
